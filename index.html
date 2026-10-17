@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vijayadashami - Defeat Ravana Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Poppins:wght@400;600;700&display=swap');
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #d9531e;
+      color: #fff;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    .font-cinzel {
+      font-family: 'Cinzel', serif;
+    }
+
+    /* Game Scene Container */
+    .game-bg {
+      background: linear-gradient(135deg, #e65100 0%, #bf360c 50%, #880e4f 100%);
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
+    }
+
+    /* Floating particles background */
+    #bgCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Floating Trait Text */
+    .floating-trait {
+      position: absolute;
+      animation: floatUp 1.8s ease-out forwards;
+      font-weight: bold;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 69, 0, 0.8);
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(0.8); }
+      50% { opacity: 1; transform: translateY(-40px) scale(1.2); }
+      100% { opacity: 0; transform: translateY(-80px) scale(1); }
+    }
+
+    /* Head Shake/Hit Animation */
+    .head-hit {
+      animation: headVanquish 0.6s ease-out forwards;
+    }
+
+    @keyframes headVanquish {
+      0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+      20% { transform: scale(1.3) rotate(15deg); filter: brightness(2) drop-shadow(0 0 15px #ffeb3b); }
+      40% { transform: scale(1.1) rotate(-15deg); filter: brightness(3) drop-shadow(0 0 25px #ff5722); }
+      100% { transform: scale(0) rotate(180deg); opacity: 0; }
+    }
+
+    /* Arrow Flying Animation */
+    .arrow-container {
+      position: absolute;
+      pointer-events: none;
+      z-index: 40;
+      transition: transform 0.05s linear;
+    }
+
+    /* Custom Scrollbar for Modal */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #3e1b00;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #f59e0b;
+      border-radius: 4px;
+    }
+
+    /* Pulsing Glow */
+    .glow-pulse {
+      animation: pulseGlow 2s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.6)); }
+      to { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 1)); }
+    }
+
+    .head-target:hover {
+      cursor: pointer;
+      filter: drop-shadow(0 0 12px #ffeb3b);
+      transform: scale(1.08);
+    }
+
+    .bow-interactive {
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .bow-interactive:hover {
+      filter: drop-shadow(0 0 15px #ffe082);
+      transform: scale(1.03);
+    }
+  </style>
+</head>
+<div class="min-h-screen flex flex-col justify-between relative overflow-hidden game-bg select-none">
+  
+  <!-- Canvas for dynamic weather / particles / victory fireworks -->
+  <canvas id="bgCanvas"></canvas>
+  <canvas id="fireworksCanvas" class="absolute inset-0 pointer-events-none z-40 hidden"></canvas>
+
+  <!-- Top Bar / Header -->
+  <header class="relative z-10 w-full p-4 flex flex-wrap justify-between items-center bg-black/30 backdrop-blur-md border-b border-amber-500/30">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-amber-950 font-bold text-xl shadow-lg border border-amber-300">
+        <i class="fa-solid fa-om"></i>
+      </div>
+      <div>
+        <h1 class="font-cinzel text-xl sm:text-2xl font-black text-amber-300 tracking-wider">VIJAYADASHAMI</h1>
+        <p class="text-xs text-amber-100/80">Victory of Good over Evil</p>
+      </div>
+    </div>
+
+    <!-- Health / Head Counter -->
+    <div class="flex items-center gap-4 my-2 sm:my-0">
+      <div class="bg-black/50 px-4 py-2 rounded-xl border border-amber-500/40 flex items-center gap-3 shadow-inner">
+        <i class="fa-solid fa-skull-crossbones text-amber-400 text-lg"></i>
+        <div>
+          <div class="text-xs text-amber-200/80">Ravana's Heads</div>
+          <div class="text-lg font-bold text-amber-400 font-cinzel leading-none" id="headCounter">10 / 10</div>
+        </div>
+      </div>
+
+      <!-- Mute Sound Toggle -->
+      <button id="muteBtn" class="bg-amber-600/40 hover:bg-amber-600/70 border border-amber-400/50 p-2.5 rounded-xl transition text-amber-200">
+        <i class="fa-solid fa-volume-high text-lg" id="muteIcon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Game Stage -->
+  <main class="relative z-10 flex-1 flex flex-col items-center justify-between p-2 sm:p-6 max-w-6xl mx-auto w-full">
+    
+    <!-- Title Banner -->
+    <div class="text-center my-2">
+      <h2 class="font-cinzel text-2xl sm:text-4xl font-extrabold text-amber-300 tracking-wide glow-pulse uppercase">
+        Happy Dussehra
+      </h2>
+      <p class="text-xs sm:text-sm text-amber-100/90 mt-1 max-w-md mx-auto">
+        Tap Lord Rama's <span class="text-amber-300 font-bold">Bow</span> or directly target <span class="text-amber-300 font-bold">Ravana's Heads</span> to shoot and vanquish the 10 evils!
+      </p>
+    </div>
+
+    <!-- Battle Scene Container -->
+    <div class="relative w-full h-[420px] sm:h-[480px] my-auto flex items-end justify-between px-2 sm:px-12 select-none">
+      
+      <!-- Background Temple Silhouette Overlay -->
+      <div class="absolute bottom-0 left-0 right-0 h-36 bg-contain bg-bottom bg-repeat-x opacity-20 pointer-events-none" 
+           style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1000 120\' fill=\'%23f59e0b\'><path d=\'M0 120 L0 80 L30 80 L40 50 L50 80 L80 80 L90 20 L100 80 L130 80 L130 120 Z M200 120 L200 70 L230 70 L240 30 L250 70 L280 70 L290 10 L300 70 L330 70 L330 120 Z M500 120 L500 75 L530 75 L540 40 L550 75 L580 75 L590 15 L600 75 L630 75 L630 120 Z\'/></svg>');">
+      </div>
+
+      <!-- RAVANA (LEFT SIDE) -->
+      <div id="ravanaContainer" class="relative flex flex-col items-center z-20 w-1/2 max-w-[340px] sm:max-w-[420px] transition-transform">
+        
+        <!-- Ravana Heads Row -->
+        <div id="ravanaHeadsRow" class="relative w-full h-28 sm:h-36 flex items-end justify-center">
+          <!-- Heads will be rendered dynamically via JS -->
+        </div>
+
+        <!-- Ravana Body SVG -->
+        <div class="relative w-48 sm:w-64 h-56 sm:h-64 mt-[-10px]">
+          <svg viewBox="0 0 200 220" class="w-full h-full drop-shadow-2xl">
+            <!-- Torso / Shoulders -->
+            <path d="M 40 50 Q 100 30 160 50 L 150 130 Q 100 140 50 130 Z" fill="#d97706" stroke="#78350f" stroke-width="3"/>
+            <!-- Muscle Highlights -->
+            <path d="M 60 65 Q 85 75 95 95" fill="none" stroke="#b45309" stroke-width="4" stroke-linecap="round"/>
+            <path d="M 140 65 Q 115 75 105 95" fill="none" stroke="#b45309" stroke-width="4" stroke-linecap="round"/>
+            <!-- Gold Sash / Cloth -->
+            <path d="M 45 50 L 155 50 L 130 130 L 70 130 Z" fill="#f59e0b" opacity="0.9"/>
+            <path d="M 70 50 L 130 130" stroke="#ca8a04" stroke-width="8"/>
+            <path d="M 130 50 L 70 130" stroke="#ca8a04" stroke-width="8"/>
+            <!-- Belt / Waistband -->
+            <rect x="50" y="125" width="100" height="16" rx="4" fill="#ca8a04" stroke="#78350f" stroke-width="2"/>
+            <circle cx="100" cy="133" r="10" fill="#fef08a" stroke="#78350f" stroke-width="2"/>
+            <!-- Lower Dhoti -->
+            <path d="M 50 140 L 25 210 L 80 210 L 100 150 L 120 210 L 175 210 L 150 140 Z" fill="#eab308" stroke="#854d0e" stroke-width="3"/>
+            <path d="M 90 140 L 80 215 L 120 215 L 110 140 Z" fill="#b45309"/>
+
+            <!-- Arms & Mace (Gada) -->
+            <!-- Left Arm holding Gada -->
+            <path d="M 40 55 L 10 90 L 20 120 L 40 100" fill="#d97706" stroke="#78350f" stroke-width="3"/>
+            <!-- Gold Arm Bands -->
+            <rect x="15" y="85" width="18" height="10" rx="2" fill="#fef08a"/>
+            <!-- Mace (Gada) -->
+            <g transform="translate(5, 100) rotate(15)">
+              <rect x="12" y="10" width="8" height="90" fill="#ca8a04" rx="3" stroke="#78350f"/>
+              <!-- Mace Head -->
+              <circle cx="16" cy="90" r="22" fill="#f59e0b" stroke="#78350f" stroke-width="3"/>
+              <circle cx="16" cy="90" r="14" fill="#fef08a"/>
+              <path d="M -4 90 L 36 90 M 16 70 L 16 110" stroke="#78350f" stroke-width="2"/>
+            </g>
+
+            <!-- Right Arm -->
+            <path d="M 160 55 L 185 95 L 170 130 L 150 100" fill="#d97706" stroke="#78350f" stroke-width="3"/>
+            <rect x="168" y="90" width="18" height="10" rx="2" fill="#fef08a"/>
+          </svg>
+        </div>
+      </div>
+
+
+      <!-- LORD RAMA (RIGHT SIDE) -->
+      <div id="ramaContainer" class="relative flex flex-col items-center z-20 w-1/2 max-w-[300px] sm:max-w-[380px]">
+        
+        <div class="relative w-48 sm:w-64 h-72 sm:h-80">
+          <!-- Rama Bow Interactive Hitbox -->
+          <div id="bowHitbox" class="bow-interactive absolute top-4 left-0 w-36 h-64 z-30 flex items-center justify-center" title="Click to Release Arrow!">
+            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-amber-400 text-amber-950 font-bold text-[10px] sm:text-xs px-2 py-0.5 rounded-full shadow-md animate-bounce border border-amber-100 whitespace-nowrap">
+              <i class="fa-solid fa-hand-pointer mr-1"></i>CLICK BOW TO SHOOT
+            </div>
+          </div>
+
+          <svg viewBox="0 0 200 240" class="w-full h-full drop-shadow-2xl">
+            <!-- Lord Rama Blue Body Silhouette -->
+            <!-- Legs -->
+            <path d="M 70 160 L 50 220 L 80 220 L 95 175 L 115 220 L 145 220 L 125 160 Z" fill="#2563eb" stroke="#1e3a8a" stroke-width="3"/>
+            <!-- Yellow Dhoti -->
+            <path d="M 60 145 L 45 200 L 90 200 L 100 160 L 110 200 L 155 200 L 140 145 Z" fill="#f59e0b" stroke="#b45309" stroke-width="2"/>
+            <path d="M 90 145 L 85 205 L 115 205 L 110 145 Z" fill="#ea580c"/>
+
+            <!-- Torso -->
+            <path d="M 65 75 Q 100 65 135 75 L 130 150 Q 100 155 70 150 Z" fill="#3b82f6" stroke="#1e3a8a" stroke-width="3"/>
+            
+            <!-- Orange Sash / Angavastram -->
+            <path d="M 65 75 L 130 145 L 110 150 L 65 90 Z" fill="#ea580c" opacity="0.9"/>
+            <path d="M 135 75 L 70 145 L 90 150 L 135 90 Z" fill="#ea580c" opacity="0.9"/>
+
+            <!-- Head & Hair Bun -->
+            <!-- Hair Bun (Jata) -->
+            <circle cx="100" cy="22" r="14" fill="#1e293b"/>
+            <circle cx="100" cy="20" r="8" fill="#f59e0b"/>
+            <!-- Face -->
+            <path d="M 82 35 C 82 25, 118 25, 118 35 C 118 55, 118 62, 100 65 C 82 62, 82 55, 82 35 Z" fill="#3b82f6" stroke="#1e3a8a" stroke-width="2"/>
+            <!-- Crown / Tilak -->
+            <path d="M 92 30 L 100 18 L 108 30 Z" fill="#fbbf24"/>
+            <path d="M 100 34 L 100 44" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- Eyes & Smile -->
+            <ellipse cx="92" cy="42" rx="3.5" ry="2" fill="#0f172a"/>
+            <ellipse cx="108" cy="42" rx="3.5" ry="2" fill="#0f172a"/>
+            <path d="M 95 53 Q 100 57 105 53" fill="none" stroke="#1e3a8a" stroke-width="2" stroke-linecap="round"/>
+
+            <!-- Left Arm holding Bow Shaft -->
+            <path d="M 75 80 L 35 100 L 25 105" fill="none" stroke="#3b82f6" stroke-width="12" stroke-linecap="round"/>
+            
+            <!-- Right Arm pulling Arrow String -->
+            <path d="M 125 80 L 155 105 L 100 110" fill="none" stroke="#3b82f6" stroke-width="11" stroke-linecap="round"/>
+
+            <!-- BOW & ARROW -->
+            <!-- Wooden Bow Arc -->
+            <path d="M 25 20 Q -15 110 25 200" fill="none" stroke="#78350f" stroke-width="7" stroke-linecap="round"/>
+            <path d="M 25 20 Q -15 110 25 200" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+            <!-- Bow Gold Ends -->
+            <circle cx="25" cy="20" r="5" fill="#fef08a"/>
+            <circle cx="25" cy="200" r="5" fill="#fef08a"/>
+            
+            <!-- Bowstring -->
+            <line x1="25" y1="20" x2="100" y2="110" stroke="#fef08a" stroke-width="1.5" opacity="0.8"/>
+            <line x1="25" y1="200" x2="100" y2="110" stroke="#fef08a" stroke-width="1.5" opacity="0.8"/>
+
+            <!-- Loaded Arrow ready on Bow -->
+            <g id="loadedArrow">
+              <!-- Golden Arrow Shaft -->
+              <line x1="10" y1="110" x2="110" y2="110" stroke="#f59e0b" stroke-width="4"/>
+              <!-- Arrowhead -->
+              <polygon points="10,110 24,103 20,110 24,117" fill="#fef08a" stroke="#b45309" stroke-width="1"/>
+              <!-- Arrow Fletching/Feathers -->
+              <polygon points="110,110 120,103 116,110 120,117" fill="#dc2626"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Interactive Launch Button / Mobile Controls -->
+    <div class="w-full max-w-md mx-auto my-2 flex flex-col items-center gap-2">
+      <button id="shootBtn" class="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-amber-950 font-black py-3.5 px-6 rounded-2xl shadow-xl border-2 border-yellow-200 transform active:scale-95 transition flex items-center justify-center gap-3 text-lg font-cinzel tracking-wider">
+        <i class="fa-solid fa-location-arrow text-xl"></i>
+        RELEASE DIVINE ARROW
+      </button>
+      <div class="text-[11px] text-amber-200/70 text-center">
+        Tip: Click on specific heads to target individual vices!
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer Info -->
+  <footer class="relative z-10 w-full p-2 text-center text-xs text-amber-200/60 bg-black/20">
+    Vijayadashami Festival Game &bull; Celebrating Truth, Virtue & Righteousness
+  </footer>
+
+
+  <!-- VICTORY CELEBRATION MODAL -->
+  <div id="victoryModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-500 overflow-y-auto">
+    <div class="bg-gradient-to-b from-amber-950 via-amber-900 to-stone-900 border-2 border-amber-400/80 rounded-3xl max-w-xl w-full p-6 sm:p-8 text-center shadow-2xl relative my-8">
+      
+      <!-- Top Decorative Star/Icon -->
+      <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-full border-4 border-amber-100 flex items-center justify-center shadow-lg">
+        <i class="fa-solid fa-trophy text-amber-950 text-3xl"></i>
+      </div>
+
+      <div class="mt-6">
+        <span class="text-xs font-bold uppercase tracking-widest text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-400/30">
+          VICTORY OF RIGHTEOUSNESS
+        </span>
+        <h2 class="font-cinzel text-3xl sm:text-4xl font-black text-amber-300 mt-2 tracking-wide glow-pulse">
+          SHUBH VIJAYADASHAMI!
+        </h2>
+        <p class="text-amber-100/90 text-sm mt-2">
+          You have successfully destroyed all 10 heads of Ravana and eliminated the ten evil virtues from the world!
+        </p>
+      </div>
+
+      <!-- Certificate Preview Container -->
+      <div class="mt-6 p-4 sm:p-6 bg-gradient-to-b from-amber-100 to-amber-50 rounded-2xl text-amber-950 border-4 border-amber-400 shadow-inner text-left relative overflow-hidden" id="certificateCard">
+        <!-- Certificate Watermark Icon -->
+        <div class="absolute -right-6 -bottom-6 text-amber-200/40 text-9xl pointer-events-none">
+          <i class="fa-solid fa-om"></i>
+        </div>
+
+        <div class="text-center border-b-2 border-amber-800/30 pb-3 mb-3">
+          <div class="font-cinzel font-bold text-xs text-amber-800 tracking-widest uppercase">DIVINE VICTORY CERTIFICATE</div>
+          <div class="font-cinzel font-black text-xl text-amber-950">DEFEATER OF EVIL</div>
+        </div>
+
+        <div class="space-y-3">
+          <p class="text-xs text-amber-900 text-center italic">
+            "When righteousness triumphs, peace and prosperity reign supreme."
+          </p>
+
+          <div class="mt-3">
+            <label class="block text-xs font-bold text-amber-900 mb-1">Enter Your Name for Blessing Token:</label>
+            <input type="text" id="playerNameInput" placeholder="Your Sacred Name" value="Warrior of Light" 
+                   class="w-full px-3 py-2 rounded-lg bg-white border border-amber-400 text-amber-950 font-bold focus:outline-none focus:ring-2 focus:ring-amber-600 text-sm">
+          </div>
+
+          <!-- List of Defeated Evils -->
+          <div class="mt-3">
+            <div class="text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-1">10 Evils Conquered:</div>
+            <div class="grid grid-cols-2 gap-1 text-[11px] text-amber-900 font-semibold">
+              <div>&#10004; Kama (Lust)</div>
+              <div>&#10004; Krodha (Anger)</div>
+              <div>&#10004; Moha (Attachment)</div>
+              <div>&#10004; Lobha (Greed)</div>
+              <div>&#10004; Mada (Pride)</div>
+              <div>&#10004; Matsarya (Envy)</div>
+              <div>&#10004; Swartha (Selfishness)</div>
+              <div>&#10004; Injustice</div>
+              <div>&#10004; Ahankara (Ego)</div>
+              <div>&#10004; Asatya (Lies)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Digital Blessing Badge Footer -->
+        <div class="mt-4 pt-3 border-t border-amber-800/20 flex items-center justify-between text-[11px] text-amber-900 font-bold">
+          <div>Blessed on Vijayadashami</div>
+          <div class="flex items-center gap-1 text-amber-700">
+            <i class="fa-solid fa-award text-base text-amber-600"></i> Authentic Token
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Action Buttons -->
+      <div class="mt-6 flex flex-col sm:flex-row gap-3">
+        <button id="downloadCertBtn" class="flex-1 bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-sm font-cinzel">
+          <i class="fa-solid fa-download"></i> CLAIM BLESSING CARD
+        </button>
+        <button id="playAgainBtn" class="flex-1 bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-500/50 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-sm font-cinzel">
+          <i class="fa-solid fa-rotate-right"></i> PLAY AGAIN
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- JAVASCRIPT GAME LOGIC -->
+  <script>
+    // 10 Evil traits corresponding to Ravana's 10 heads
+    const EVIL_TRAITS = [
+      { id: 0, name: "Kama", desc: "Lust" },
+      { id: 1, name: "Krodha", desc: "Anger" },
+      { id: 2, name: "Moha", desc: "Attachment" },
+      { id: 3, name: "Lobha", desc: "Greed" },
+      { id: 4, name: "Ahankara", desc: "Ego (Main)" }, // Main head center
+      { id: 5, name: "Mada", desc: "Pride" },
+      { id: 6, name: "Matsarya", desc: "Envy" },
+      { id: 7, name: "Swartha", desc: "Selfishness" },
+      { id: 8, name: "Anaya", desc: "Injustice" },
+      { id: 9, name: "Asatya", desc: "Lies" }
+    ];
+
+    // State
+    let activeHeads = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let isShooting = false;
+    let soundMuted = false;
+
+    // Web Audio API Sound Synthesizer (No external audio files required)
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Play Bow Twang sound
+    function playBowSound() {
+      if (soundMuted) return;
+      initAudio();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+        
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } catch(e){}
+    }
+
+    // Play Impact / Explosive Hit sound
+    function playHitSound() {
+      if (soundMuted) return;
+      initAudio();
+      try {
+        // Noise buffer for explosion effect
+        const bufferSize = audioCtx.sampleRate * 0.3;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+        filter.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        whiteNoise.start();
+        whiteNoise.stop(audioCtx.currentTime + 0.3);
+      } catch(e){}
+    }
+
+    // Play Victory Bells / Chime
+    function playVictorySound() {
+      if (soundMuted) return;
+      initAudio();
+      try {
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+          
+          gain.gain.setValueAtTime(0, audioCtx.currentTime + idx * 0.12);
+          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + idx * 0.12 + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.8);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(audioCtx.currentTime + idx * 0.12);
+          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.8);
+        });
+      } catch(e){}
+    }
+
+
+    // Render Ravana's 10 Heads
+    function renderRavanaHeads() {
+      const container = document.getElementById('ravanaHeadsRow');
+      container.innerHTML = '';
+
+      // Arrange heads horizontally centered: 0..3 (left), 4 (center main), 5..9 (right)
+      EVIL_TRAITS.forEach((trait) => {
+        const isCenter = trait.id === 4; // Main central head
+        const isActive = activeHeads.includes(trait.id);
+
+        const headWrapper = document.createElement('div');
+        headWrapper.id = `head-${trait.id}`;
+        headWrapper.className = `relative flex flex-col items-center transition-all duration-300 mx-[-4px] sm:mx-[-2px] ${isCenter ? 'z-20 -top-2' : 'z-10'}`;
+
+        if (!isActive) {
+          headWrapper.style.visibility = 'hidden';
+          headWrapper.style.pointerEvents = 'none';
+        } else {
+          headWrapper.classList.add('head-target');
+          headWrapper.onclick = (e) => {
+            e.stopPropagation();
+            shootAtHead(trait.id);
+          };
+        }
+
+        // SVG Head Illustration
+        const scale = isCenter ? 'w-12 h-14 sm:w-16 sm:h-20' : 'w-8 h-10 sm:w-11 sm:h-14';
+        
+        headWrapper.innerHTML = `
+          <div class="relative ${scale}">
+            <svg viewBox="0 0 60 70" class="w-full h-full drop-shadow-md">
+              <!-- Golden Crown -->
+              <path d="M 10 25 L 15 5 L 25 15 L 30 0 L 35 15 L 45 5 L 50 25 Z" fill="#fbbf24" stroke="#78350f" stroke-width="1.5"/>
+              <circle cx="30" cy="10" r="3" fill="#dc2626"/>
+              <!-- Crown Base -->
+              <rect x="8" y="22" width="44" height="6" fill="#f59e0b" rx="2" stroke="#78350f" stroke-width="1"/>
+              
+              <!-- Head/Face -->
+              <ellipse cx="30" cy="45" rx="20" ry="20" fill="#d97706" stroke="#78350f" stroke-width="1.5"/>
+              <!-- Hair Side -->
+              <path d="M 8 35 Q 2 45 8 55" fill="none" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+              <path d="M 52 35 Q 58 45 52 55" fill="none" stroke="#1e293b" stroke-width="4" stroke-linecap="round"/>
+              
+              <!-- Moustache -->
+              <path d="M 15 52 Q 30 45 45 52 Q 30 62 15 52 Z" fill="#0f172a"/>
+              
+              <!-- Eyes & Eyebrows -->
+              <path d="M 16 36 Q 22 32 26 38" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+              <path d="M 44 36 Q 38 32 34 38" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+              <circle cx="21" cy="40" r="2" fill="#0f172a"/>
+              <circle cx="39" cy="40" r="2" fill="#0f172a"/>
+              
+              <!-- Tilak -->
+              <path d="M 28 28 L 32 28 L 30 35 Z" fill="#dc2626"/>
+            </svg>
+          </div>
+          <!-- Trait Label -->
+          <span class="text-[9px] sm:text-[10px] font-bold text-amber-200 bg-black/60 px-1 rounded -mt-1 whitespace-nowrap border border-amber-500/30">
+            ${trait.name}
+          </span>
+        `;
+
+        container.appendChild(headWrapper);
+      });
+
+      // Update Header counter
+      document.getElementById('headCounter').innerText = `${activeHeads.length} / 10`;
+    }
+
+
+    // Shoot Arrow towards target head
+    function shootAtHead(targetHeadId = null) {
+      if (isShooting || activeHeads.length === 0) return;
+
+      // If no specific head passed, pick one (prioritize non-center first, center last)
+      if (targetHeadId === null || !activeHeads.includes(targetHeadId)) {
+        const nonCenter = activeHeads.filter(id => id !== 4);
+        if (nonCenter.length > 0) {
+          targetHeadId = nonCenter[Math.floor(Math.random() * nonCenter.length)];
+        } else {
+          targetHeadId = 4; // Main head
+        }
+      }
+
+      isShooting = true;
+      playBowSound();
+
+      const targetHeadElem = document.getElementById(`head-${targetHeadId}`);
+      const ramaElem = document.getElementById('ramaContainer');
+
+      if (!targetHeadElem) {
+        isShooting = false;
+        return;
+      }
+
+      // Calculate position for arrow flight trajectory
+      const targetRect = targetHeadElem.getBoundingClientRect();
+      const ramaRect = ramaElem.getBoundingClientRect();
+
+      // Create Flying Arrow Element dynamically
+      const arrowElem = document.createElement('div');
+      arrowElem.className = 'arrow-container';
+      arrowElem.innerHTML = `
+        <svg width="80" height="20" viewBox="0 0 80 20">
+          <line x1="0" y1="10" x2="70" y2="10" stroke="#f59e0b" stroke-width="4"/>
+          <polygon points="80,10 65,3 68,10 65,17" fill="#fef08a" stroke="#b45309" stroke-width="1"/>
+          <polygon points="0,10 -10,3 -5,10 -10,17" fill="#dc2626"/>
+        </svg>
+      `;
+
+      document.body.appendChild(arrowElem);
+
+      // Start position (from Lord Rama's bow)
+      const startX = ramaRect.left + 30;
+      const startY = ramaRect.top + 100;
+
+      // End position (Target head center)
+      const endX = targetRect.left + targetRect.width / 2;
+      const endY = targetRect.top + targetRect.height / 2;
+
+      // Initial arrow pose
+      arrowElem.style.left = `${startX}px`;
+      arrowElem.style.top = `${startY}px`;
+
+      // Animate Arrow Flight using CSS/JS
+      const startTime = performance.now();
+      const duration = 300; // ms flight speed
+
+      function animateArrow(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        const currentX = startX + (endX - startX) * progress;
+        const currentY = startY + (endY - startY) * progress;
+
+        // Calculate rotation angle towards target
+        const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
+
+        arrowElem.style.transform = `translate3d(${currentX - startX}px, ${currentY - startY}px, 0) rotate(${angle}deg)`;
+
+        if (progress < 1) {
+          requestAnimationFrame(animateArrow);
+        } else {
+          // Arrow reached head target
+          arrowElem.remove();
+          onHeadHit(targetHeadId, endX, endY);
+        }
+      }
+
+      requestAnimationFrame(animateArrow);
+    }
+
+
+    // Handle Arrow Impact on Head
+    function onHeadHit(headId, hitX, hitY) {
+      playHitSound();
+
+      // Trigger hit animation on target head
+      const headElem = document.getElementById(`head-${headId}`);
+      if (headElem) {
+        headElem.classList.add('head-hit');
+      }
+
+      // Display floating virtue trait text
+      const traitObj = EVIL_TRAITS.find(t => t.id === headId);
+      if (traitObj) {
+        const floatTxt = document.createElement('div');
+        floatTxt.className = 'floating-trait font-cinzel text-amber-300 text-lg sm:text-2xl';
+        floatTxt.innerText = `Vanquished: ${traitObj.name} (${traitObj.desc})`;
+        floatTxt.style.left = `${hitX - 80}px`;
+        floatTxt.style.top = `${hitY - 40}px`;
+        document.body.appendChild(floatTxt);
+
+        setTimeout(() => floatTxt.remove(), 1800);
+      }
+
+      // Remove head from active list after animation completes
+      setTimeout(() => {
+        activeHeads = activeHeads.filter(id => id !== headId);
+        renderRavanaHeads();
+        isShooting = false;
+
+        // Check Victory Condition
+        if (activeHeads.length === 0) {
+          triggerVictoryCelebration();
+        }
+      }, 500);
+    }
+
+
+    // Trigger Grand Victory Celebration Screen
+    function triggerVictoryCelebration() {
+      playVictorySound();
+
+      // Hide Ravana body slightly with glow fade
+      const ravana = document.getElementById('ravanaContainer');
+      ravana.style.transition = 'opacity 1.5s ease, transform 1.5s ease';
+      ravana.style.opacity = '0.2';
+      ravana.style.transform = 'scale(0.8)';
+
+      // Show Fireworks Canvas
+      const fireworksCanvas = document.getElementById('fireworksCanvas');
+      fireworksCanvas.classList.remove('hidden');
+      startFireworks();
+
+      // Show Victory Modal
+      setTimeout(() => {
+        const modal = document.getElementById('victoryModal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.remove('opacity-0'), 50);
+      }, 1000);
+    }
+
+
+    // Reset Game State
+    function resetGame() {
+      activeHeads = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+      isShooting = false;
+
+      const ravana = document.getElementById('ravanaContainer');
+      ravana.style.opacity = '1';
+      ravana.style.transform = 'scale(1)';
+
+      const fireworksCanvas = document.getElementById('fireworksCanvas');
+      fireworksCanvas.classList.add('hidden');
+
+      const modal = document.getElementById('victoryModal');
+      modal.classList.add('opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 500);
+
+      renderRavanaHeads();
+    }
+
+
+    // Dynamic Background Floating Sparkles / Particles
+    function initBackgroundParticles() {
+      const canvas = document.getElementById('bgCanvas');
+      const ctx = canvas.getContext('2d');
+
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      const particles = [];
+      for (let i = 0; i < 40; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          radius: Math.random() * 2.5 + 1,
+          alpha: Math.random() * 0.8 + 0.2,
+          speedY: -Math.random() * 0.8 - 0.2,
+          speedX: (Math.random() - 0.5) * 0.5
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        particles.forEach(p => {
+          p.y += p.speedY;
+          p.x += p.speedX;
+
+          if (p.y < 0) {
+            p.y = height;
+            p.x = Math.random() * width;
+          }
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(254, 240, 138, ${p.alpha})`;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#f59e0b';
+          ctx.fill();
+        });
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+
+    // Fireworks Effect for Victory
+    function startFireworks() {
+      const canvas = document.getElementById('fireworksCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#f59e0b', '#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#fef08a'];
+
+      function createExplosion(x, y) {
+        for (let i = 0; i < 50; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.random() * 6 + 2;
+          particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: 1,
+            color: colors[Math.floor(Math.random() * colors.length)]
+          });
+        }
+      }
+
+      let timer = 0;
+      function loop() {
+        if (document.getElementById('victoryModal').classList.contains('hidden') && timer > 200) return;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (timer % 25 === 0) {
+          createExplosion(
+            Math.random() * canvas.width,
+            Math.random() * (canvas.height * 0.6)
+          );
+        }
+        timer++;
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.05; // gravity
+          p.alpha -= 0.015;
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.alpha;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        requestAnimationFrame(loop);
+      }
+
+      loop();
+    }
+
+
+    // Download Personal Digital Certificate Token
+    function downloadCertificate() {
+      const name = document.getElementById('playerNameInput').value.trim() || 'Warrior of Light';
+
+      const certCanvas = document.createElement('canvas');
+      certCanvas.width = 800;
+      certCanvas.height = 500;
+      const ctx = certCanvas.getContext('2d');
+
+      // Gradient Background
+      const grad = ctx.createLinearGradient(0, 0, 800, 500);
+      grad.addColorStop(0, '#78350f');
+      grad.addColorStop(0.5, '#451a03');
+      grad.addColorStop(1, '#1c1917');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 500);
+
+      // Gold Border
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(20, 20, 760, 460);
+
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(30, 30, 740, 440);
+
+      // Header Text
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 24px Cinzel, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('DIVINE VICTORY CERTIFICATE', 400, 80);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 36px Cinzel, serif';
+      ctx.fillText('SHUBH VIJAYADASHAMI', 400, 130);
+
+      // Recipient
+      ctx.fillStyle = '#fef08a';
+      ctx.font = '20px Poppins, sans-serif';
+      ctx.fillText('This Token of Virtuous Victory is Presented to:', 400, 190);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 32px Poppins, sans-serif';
+      ctx.fillText(name, 400, 240);
+
+      // Blessing Description
+      ctx.fillStyle = '#f3f4f6';
+      ctx.font = '16px Poppins, sans-serif';
+      ctx.fillText('For conquering all 10 evils and upholding Truth, Honor & Righteousness.', 400, 290);
+
+      // Evils Conquered List
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 14px Poppins, sans-serif';
+      ctx.fillText('Conquered Evils: Kama, Krodha, Moha, Lobha, Mada, Matsarya, Swartha, Anaya, Ahankara, Asatya', 400, 340);
+
+      // Date / Seal
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '14px Poppins, sans-serif';
+      ctx.fillText(`Issued on: ${today} • Festival of Dussehra`, 400, 420);
+
+      // Trigger image download
+      const link = document.createElement('a');
+      link.download = `Vijayadashami_Blessing_${name.replace(/\s+/g, '_')}.png`;
+      link.href = certCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+
+    // Event Listeners Setup
+    window.onload = function() {
+      initBackgroundParticles();
+      renderRavanaHeads();
+
+      // Controls
+      document.getElementById('shootBtn').onclick = () => shootAtHead();
+      document.getElementById('bowHitbox').onclick = () => shootAtHead();
+      document.getElementById('playAgainBtn').onclick = resetGame;
+      document.getElementById('downloadCertBtn').onclick = downloadCertificate;
+
+      // Sound Toggle
+      document.getElementById('muteBtn').onclick = () => {
+        soundMuted = !soundMuted;
+        const icon = document.getElementById('muteIcon');
+        if (soundMuted) {
+          icon.className = 'fa-solid fa-volume-xmark text-lg text-red-400';
+        } else {
+          icon.className = 'fa-solid fa-volume-high text-lg text-amber-200';
+        }
+      };
+    };
+  </script>
+</body>
+</html>
